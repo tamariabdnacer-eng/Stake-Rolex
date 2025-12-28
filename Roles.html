@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>Stake Rolex</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+body {
+    background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+    color:#fff;
+    font-family:'Orbitron', sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:20px;
+}
+h1 {text-shadow: 2px 2px 5px rgba(0,0,0,0.5);}
+.container {
+    background: linear-gradient(145deg,#1c1c1c,#2c2c2c);
+    padding:20px;
+    border-radius:15px;
+    margin:20px;
+    width:360px;
+    text-align:center;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+input, select, button {
+    margin:10px 0;
+    padding:10px;
+    width:80%;
+    border-radius:10px;
+    border:none;
+    font-size:16px;
+    outline:none;
+}
+input, select { background:#222; color:#fff; }
+button {
+    background: linear-gradient(90deg,#09ff00,#005c17);
+    color:#000;
+    cursor:pointer;
+    font-weight:bold;
+    transition: 0.3s;
+}
+button:hover { transform: scale(1.1); box-shadow:0 0 10px rgb(43, 255, 0),0 0 20px rgb(0, 100, 5); }
+#balance { font-size:20px; margin-bottom:20px; color:#0f0; text-shadow:1px 1px 5px #000; }
+#rouletteCanvas { background:#111; border-radius:50%; margin:20px auto; display:block; }
+
+#slotSymbols {
+    font-size:55px;
+    margin:20px 0;
+    transition: transform 0.3s;
+}
+
+.win { color:#0f0; font-weight:bold; animation: glow 1s infinite alternate; }
+.lose { color:#f00; font-weight:bold; animation: shake 0.5s; }
+
+@keyframes glow {
+ 0%{text-shadow:0 0 5px #0f0;}
+ 50%{text-shadow:0 0 20px #0f0,0 0 30px #0f0;}
+ 100%{text-shadow:0 0 5px #0f0;}
+}
+@keyframes shake {
+ 0%{transform:translateX(0px);}
+ 25%{transform:translateX(-5px);}
+ 50%{transform:translateX(5px);}
+ 75%{transform:translateX(-5px);}
+ 100%{transform:translateX(0px);}
+}
+</style>
+</head>
+<body>
+
+<h1>Stake Rolex</h1>
+<p id="balance">تحميل الرصيد...</p>
+
+<!-- شحن وسحب -->
+<div class="container">
+  <h2>💳 شحن / سحب</h2>
+  <label>المبلغ:</label>
+  <input type="number" id="transferAmount" min="1">
+  <button onclick="depositFromStake()">شحن من الحساب الرئيسي</button>
+  <button onclick="withdrawToStake()">سحب إلى الحساب الرئيسي</button>
+  <p id="transferMsg"></p>
+</div>
+
+<!-- روليت -->
+<div class="container" id="roulette-game">
+  <h2>🎯 لعبة الروليت</h2>
+  <canvas id="rouletteCanvas" width="300" height="300"></canvas>
+  <label>اختر رقم (0-36):</label>
+  <input type="number" id="userNumber" min="0" max="36">
+  
+  <label>أو اختر لون:</label>
+  <select id="userColor">
+    <option value="">--اختر--</option>
+    <option value="أحمر">أحمر</option>
+    <option value="أسود">أسود</option>
+    <option value="أزرق">أزرق</option>
+    <option value="أخضر فاتح">أخضر فاتح</option>
+    <option value="بنفسجي">بنفسجي</option>
+  </select>
+
+  <label>الرهان:</label>
+  <input type="number" id="betAmount" min="1">
+
+  <button onclick="spinRoulette()">دور الروليت</button>
+  <p id="rouletteResult"></p>
+</div>
+
+<!-- Slot Machine 4X -->
+<div class="container" id="slot-game">
+  <h2>🎰 ماكينة الحظ 4X</h2>
+  <label>الرهان:</label>
+  <input type="number" id="slotBet" min="1">
+  <button onclick="spinSlot()">تشغيل</button>
+  <p id="slotResult"></p>
+  <div id="slotSymbols"></div>
+</div>
+
+<script>
+// ---------------- Firebase ----------------
+const firebaseConfig = {
+  apiKey:"AIzaSyAM7gLKuLRfhFdWyakFS1jU4c8xU1fg-FU",
+  authDomain:"family-bank-966ae.firebaseapp.com",
+  databaseURL:"https://family-bank-966ae-default-rtdb.firebaseio.com",
+  projectId:"family-bank-966ae"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let currentUser = "";
+let balance = 0;
+
+// طلب اسم المستخدم و PIN
+function askUserCredentials(){
+    let username = prompt("ادخل اسم المستخدم لربط الرصيد:").trim().toLowerCase();
+    let pin = prompt("ادخل PIN المستخدم:").trim();
+    if(!username || !pin){ alert("يجب إدخال اسم المستخدم و PIN!"); return askUserCredentials(); }
+
+    db.ref("gamerolex/"+username).once("value").then(s=>{
+        let u = s.val();
+        if(!u){
+            alert("المستخدم غير موجود! سيتم إنشاء حساب جديد.");
+            db.ref("gamerolex/"+username).set({balance:0, pin:pin});
+            balance=0;
+        } else {
+            if(u.pin!==pin){ alert("PIN خاطئ!"); return askUserCredentials(); }
+            balance = Number(u.balance || 0);
+        }
+        currentUser=username;
+        updateBalance();
+    });
+}
+askUserCredentials();
+
+function updateBalance(){
+    document.getElementById("balance").innerText = `رصيدك: ${balance} رصيد`;
+}
+
+// ------------------ شحن ------------------
+function depositFromStake(){
+    let amount = parseFloat(document.getElementById("transferAmount").value);
+    if(amount<=0){ transferMsg.innerText="❌ أدخل مبلغ صحيح"; return; }
+
+    db.ref("userStake/"+currentUser).once("value").then(s=>{
+        let main = s.val();
+        if(!main || main.balance < amount){ transferMsg.innerText="❌ رصيدك في الحساب الرئيسي غير كافي"; return; }
+
+        db.ref("userStake/"+currentUser+"/balance").transaction(b => (b||0)-amount);
+
+        db.ref("gamerolex/"+currentUser).transaction(u=>{
+            if(!u) u={balance:0};
+            u.balance=(u.balance||0)+amount;
+            return u;
+        }).then(()=>{ 
+            balance += amount;
+            updateBalance();
+            transferMsg.innerText=`✅ تم شحن ${amount} رصيد`; 
+        });
+    });
+}
+
+// ------------------ سحب ------------------
+function withdrawToStake(){
+    let amount = parseFloat(document.getElementById("transferAmount").value);
+    if(amount<=0){ transferMsg.innerText="❌ مبلغ غير صحيح"; return; }
+    if(amount>balance){ transferMsg.innerText="❌ رصيد Rolex غير كافي"; return; }
+
+    db.ref("gamerolex/"+currentUser+"/balance").transaction(b=> (b||0)-amount);
+    db.ref("userStake/"+currentUser+"/balance").transaction(b => (b||0)+amount)
+    .then(()=>{
+        balance -= amount;
+        updateBalance();
+        transferMsg.innerText=`✅ تم السحب`; 
+    });
+}
+
+// ----------------- روليت -----------------
+const canvas = document.getElementById("rouletteCanvas");
+const ctx = canvas.getContext("2d");
+const numbers = Array.from({length:37},(_,i)=>i);
+const colorList = ["red","black","blue","lightgreen","purple"];
+let angle=0;
+
+function drawRoulette(){
+    const center=canvas.width/2;
+    const radius=center-10;
+    const slice=2*Math.PI/numbers.length;
+    for(let i=0;i<numbers.length;i++){
+        ctx.beginPath();
+        ctx.moveTo(center,center);
+        ctx.arc(center,center,radius,i*slice,(i+1)*slice);
+        ctx.fillStyle = i===0?"green":colorList[i%colorList.length];
+        ctx.fill();
+        ctx.strokeStyle="#fff";
+        ctx.stroke();
+        ctx.save();
+        ctx.translate(center,center);
+        ctx.rotate(i*slice+slice/2);
+        ctx.fillStyle="#fff";
+        ctx.font="12px Arial";
+        ctx.fillText(numbers[i],radius-20,0);
+        ctx.restore();
+    }
+}
+
+function spinRoulette(){
+    let userNumber=parseInt(document.getElementById("userNumber").value);
+    let userColor=document.getElementById("userColor").value;
+    let betAmount=parseFloat(document.getElementById("betAmount").value);
+    if(betAmount>balance || betAmount<=0){alert("الرهان غير صالح!");return;}
+
+    let spinDuration=3000+Math.random()*2000;
+    let start=null;
+    let totalAngle=Math.random()*2*Math.PI+10*Math.PI;
+
+    function animate(t){
+        if(!start)start=t;
+        let p=t-start;
+        let percent=Math.min(p/spinDuration,1);
+        angle=totalAngle*(1-Math.pow(1-percent,3));
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.save();
+        ctx.translate(canvas.width/2,canvas.height/2);
+        ctx.rotate(angle);
+        ctx.translate(-canvas.width/2,-canvas.height/2);
+        drawRoulette();
+        ctx.restore();
+        if(percent<1)requestAnimationFrame(animate);
+        else finishRoulette();
+    }
+
+    function finishRoulette(){
+        const finalIndex=Math.floor(numbers.length-(angle%(2*Math.PI))/(2*Math.PI/numbers.length))%numbers.length;
+        const rouletteNumber=numbers[finalIndex];
+        const rouletteColor = (rouletteNumber===0)? "green" : colorList[finalIndex%colorList.length];
+
+        let resultText=`الرقم الفائز: ${rouletteNumber} - اللون: ${rouletteColor} <br>`;
+
+        if(rouletteNumber===0){
+            balance-=betAmount*2;
+            resultText+=`<span class="lose">صفر! خسارة ×2</span>`;
+        }
+        else if(userNumber===rouletteNumber){
+            let win=betAmount*10; balance+=win;
+            resultText+=`<span class="win">فزت على الرقم +${win}</span>`;
+        }
+        else if(userColor && userColor===rouletteColor){
+            let win=betAmount*1.1; balance+=win;
+            resultText+=`<span class="win">ربح لون +${win}</span>`;
+        }
+        else{
+            balance-=betAmount;
+            resultText+=`<span class="lose">خسارة!</span>`;
+        }
+
+        db.ref("gamerolex/"+currentUser).update({balance:balance});
+        document.getElementById("rouletteResult").innerHTML=resultText;
+        updateBalance();
+    }
+    requestAnimationFrame(animate);
+}
+drawRoulette();
+
+
+// ----------------- Slot Machine 4X -----------------
+let slotBusy = false;
+
+function spinSlot(){
+    if(slotBusy) return;
+    slotBusy = true;
+
+    let bet=parseFloat(document.getElementById("slotBet").value);
+    if(bet>balance||bet<=0){alert("الرهان غير صالح!");slotBusy=false;return;}
+
+    let symbols=["🍒","🍋","🍉","⭐","💎","👑"];
+    let slotDiv=document.getElementById("slotSymbols");
+    let spinCount=30;
+    let i=0;
+
+    let tempInterval=setInterval(()=>{
+        let temp = [
+          symbols[Math.floor(Math.random()*symbols.length)],
+          symbols[Math.floor(Math.random()*symbols.length)],
+          symbols[Math.floor(Math.random()*symbols.length)],
+          symbols[Math.floor(Math.random()*symbols.length)]
+        ];
+        slotDiv.innerHTML = temp.join(" | ");
+        slotDiv.style.transform=`scale(1.2) rotate(${Math.sin(i)*10}deg)`;
+        i++;
+        if(i>=spinCount){
+            clearInterval(tempInterval);
+
+            let final = [
+                symbols[Math.floor(Math.random()*symbols.length)],
+                symbols[Math.floor(Math.random()*symbols.length)],
+                symbols[Math.floor(Math.random()*symbols.length)],
+                symbols[Math.floor(Math.random()*symbols.length)]
+            ];
+
+            slotDiv.innerHTML = final.join(" | ");
+            slotDiv.style.transform="scale(1)";
+
+            let count = {};
+            final.forEach(s=>count[s]=(count[s]||0)+1);
+            let max = Math.max(...Object.values(count));
+
+            let result="";
+            if(max===4){
+                let win=bet*2.5;
+                balance+=win;
+                result=`<span class="win">🔥 4 متشابهة! +${win}</span>`;
+            }
+            else if(max===3){
+                let win=bet*1.9;
+                balance+=win;
+                result=`<span class="win">⭐ 3 متشابهة! +${win}</span>`;
+            }
+            else if(max===2){
+                let win=bet*1.5;
+                balance+=win;
+                result=`<span class="win">💠 2 متشابهة! +${win}</span>`;
+            }
+            else{
+                balance-=bet;
+                result=`<span class="lose">❌ خسارة!</span>`;
+            }
+
+            document.getElementById("slotResult").innerHTML=result;
+            db.ref("gamerolex/"+currentUser).update({balance:balance});
+            updateBalance();
+            slotBusy=false;
+        }
+    },80);
+}
+</script>
+</body>
+</html>
