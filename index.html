@@ -37,90 +37,96 @@ input, select, button {
 }
 input, select { background:#222; color:#fff; }
 button {
-    background: linear-gradient(90deg,#09ff00,#005c17);
+    background: linear-gradient(90deg,#ff5500,#ffdd00);
     color:#000;
     cursor:pointer;
     font-weight:bold;
     transition: 0.3s;
 }
-button:hover { transform: scale(1.1); box-shadow:0 0 10px rgb(43, 255, 0),0 0 20px rgb(0, 100, 5); }
+button:hover { transform: scale(1.1); box-shadow:0 0 10px #ff0,0 0 20px #f50; }
 #balance { font-size:20px; margin-bottom:20px; color:#0f0; text-shadow:1px 1px 5px #000; }
 #rouletteCanvas { background:#111; border-radius:50%; margin:20px auto; display:block; }
-
-#slotSymbols {
-    font-size:55px;
-    margin:20px 0;
-    transition: transform 0.3s;
-}
-
+#slotSymbols { font-size:55px; margin:20px 0; transition: transform 0.3s; }
 .win { color:#0f0; font-weight:bold; animation: glow 1s infinite alternate; }
 .lose { color:#f00; font-weight:bold; animation: shake 0.5s; }
-
-@keyframes glow {
- 0%{text-shadow:0 0 5px #0f0;}
- 50%{text-shadow:0 0 20px #0f0,0 0 30px #0f0;}
- 100%{text-shadow:0 0 5px #0f0;}
-}
-@keyframes shake {
- 0%{transform:translateX(0px);}
- 25%{transform:translateX(-5px);}
- 50%{transform:translateX(5px);}
- 75%{transform:translateX(-5px);}
- 100%{transform:translateX(0px);}
-}
+@keyframes glow { 0%{text-shadow:0 0 5px #0f0;} 50%{text-shadow:0 0 20px #0f0,0 0 30px #0f0;} 100%{text-shadow:0 0 5px #0f0;} }
+@keyframes shake { 0%{transform:translateX(0px);} 25%{transform:translateX(-5px);} 50%{transform:translateX(5px);} 75%{transform:translateX(-5px);} 100%{transform:translateX(0px);} }
+#loginBox, #historyBox {width:360px; margin:10px auto; background:#1c1c1c; padding:15px; border-radius:10px;}
+#loginBox {text-align:center;}
+#historyBox {max-height:200px; overflow-y:auto; text-align:left; font-size:14px;}
 </style>
 </head>
 <body>
 
 <h1>Stake Rolex</h1>
-<p id="balance">تحميل الرصيد...</p>
 
-<!-- شحن وسحب -->
-<div class="container">
-  <h2>💳 شحن / سحب</h2>
-  <label>المبلغ:</label>
-  <input type="number" id="transferAmount" min="1">
-  <button onclick="depositFromStake()">شحن من الحساب الرئيسي</button>
-  <button onclick="withdrawToStake()">سحب إلى الحساب الرئيسي</button>
-  <p id="transferMsg"></p>
+<!-- Login -->
+<div id="loginBox">
+  <h2>تسجيل الدخول</h2>
+  <input id="username" placeholder="اسم المستخدم"><br>
+  <input id="pin" type="password" placeholder="PIN"><br>
+  <label><input type="checkbox" id="remember"> تذكرني</label><br>
+  <button onclick="login()">دخول</button>
 </div>
 
-<!-- روليت -->
-<div class="container" id="roulette-game">
-  <h2>🎯 لعبة الروليت</h2>
-  <canvas id="rouletteCanvas" width="300" height="300"></canvas>
-  <label>اختر رقم (0-36):</label>
-  <input type="number" id="userNumber" min="0" max="36">
-  
-  <label>أو اختر لون:</label>
-  <select id="userColor">
-    <option value="">--اختر--</option>
-    <option value="أحمر">أحمر</option>
-    <option value="أسود">أسود</option>
-    <option value="أزرق">أزرق</option>
-    <option value="أخضر فاتح">أخضر فاتح</option>
-    <option value="بنفسجي">بنفسجي</option>
-  </select>
+<!-- Panel بعد تسجيل الدخول -->
+<div id="panel" style="display:none;">
+  <h2>مرحبا <span id="name"></span></h2>
+  <p id="balance">رصيدك: 0</p>
 
-  <label>الرهان:</label>
-  <input type="number" id="betAmount" min="1">
+  <!-- شحن / سحب -->
+  <div class="container">
+    <h2>💳 شحن / سحب</h2>
+    <label>المبلغ:</label>
+    <input type="number" id="transferAmount" min="1">
+    <button onclick="depositFromStake()">شحن من الحساب الرئيسي</button>
+    <button onclick="withdrawToStake()">سحب إلى الحساب الرئيسي</button>
+    <p id="transferMsg"></p>
+  </div>
 
-  <button onclick="spinRoulette()">دور الروليت</button>
-  <p id="rouletteResult"></p>
-</div>
+  <!-- روليت -->
+  <div class="container" id="roulette-game">
+    <h2>🎯 لعبة الروليت</h2>
+    <canvas id="rouletteCanvas" width="300" height="300"></canvas>
+    <label>اختر رقم (0-36):</label>
+    <input type="number" id="userNumber" min="0" max="36">
+    
+    <label>أو اختر لون:</label>
+    <select id="userColor">
+      <option value="">--اختر--</option>
+      <option value="أحمر">أحمر</option>
+      <option value="أسود">أسود</option>
+      <option value="أزرق">أزرق</option>
+      <option value="أخضر فاتح">أخضر فاتح</option>
+      <option value="بنفسجي">بنفسجي</option>
+    </select>
 
-<!-- Slot Machine 4X -->
-<div class="container" id="slot-game">
-  <h2>🎰 ماكينة الحظ 4X</h2>
-  <label>الرهان:</label>
-  <input type="number" id="slotBet" min="1">
-  <button onclick="spinSlot()">تشغيل</button>
-  <p id="slotResult"></p>
-  <div id="slotSymbols"></div>
+    <label>الرهان:</label>
+    <input type="number" id="betAmount" min="1">
+
+    <button onclick="spinRoulette()">دور الروليت</button>
+    <p id="rouletteResult"></p>
+  </div>
+
+  <!-- Slot Machine 4X -->
+  <div class="container" id="slot-game">
+    <h2>🎰 ماكينة الحظ 4X</h2>
+    <label>الرهان:</label>
+    <input type="number" id="slotBet" min="1">
+    <button onclick="spinSlot()">تشغيل</button>
+    <p id="slotResult"></p>
+    <div id="slotSymbols"></div>
+  </div>
+
+  <!-- History -->
+  <div id="historyBox">
+    <h3>سجل العمليات</h3>
+  </div>
+
+  <button onclick="logout()">تسجيل خروج</button>
 </div>
 
 <script>
-// ---------------- Firebase ----------------
 const firebaseConfig = {
   apiKey:"AIzaSyAM7gLKuLRfhFdWyakFS1jU4c8xU1fg-FU",
   authDomain:"family-bank-966ae.firebaseapp.com",
@@ -133,30 +139,93 @@ const db = firebase.database();
 let currentUser = "";
 let balance = 0;
 
-// طلب اسم المستخدم و PIN
-function askUserCredentials(){
-    let username = prompt("ادخل اسم المستخدم لربط الرصيد:").trim().toLowerCase();
-    let pin = prompt("ادخل PIN المستخدم:").trim();
-    if(!username || !pin){ alert("يجب إدخال اسم المستخدم و PIN!"); return askUserCredentials(); }
-
-    db.ref("gamerolex/"+username).once("value").then(s=>{
-        let u = s.val();
-        if(!u){
-            alert("المستخدم غير موجود! سيتم إنشاء حساب جديد.");
-            db.ref("gamerolex/"+username).set({balance:0, pin:pin});
-            balance=0;
-        } else {
-            if(u.pin!==pin){ alert("PIN خاطئ!"); return askUserCredentials(); }
-            balance = Number(u.balance || 0);
-        }
-        currentUser=username;
-        updateBalance();
-    });
+// =================== Auto Login ===================
+window.onload = function(){
+ let saved = localStorage.getItem("bankUser");
+ if(saved){
+    saved = JSON.parse(saved);
+    document.getElementById("username").value = saved.username;
+    document.getElementById("pin").value = saved.pin;
+    login(true);
+ }
 }
-askUserCredentials();
 
+// =================== Login مع التحقق من userStake ===================
+function login(auto=false){
+  let user = document.getElementById("username").value.trim();
+  let pin = document.getElementById("pin").value.trim();
+  if(!user || !pin){ alert("ادخل البيانات كاملة"); return; }
+
+  // تحقق هل المستخدم موجود في userStake
+  db.ref("userStake/"+user).once("value").then(sStake=>{
+      let stakeData = sStake.val();
+      if(!stakeData){
+          alert("❌ اسم المستخدم غير موجود في الحساب الرئيسي (userStake)");
+          return;
+      }
+
+      // بعد التأكد من وجوده في userStake، نتحقق من gamerolex
+      db.ref("gamerolex/"+user).once("value").then(s=>{
+          let data = s.val();
+          if(!data){
+              // إنشاء الحساب تلقائياً في gamerolex فقط إذا موجود في userStake
+              db.ref("gamerolex/"+user).set({pin: pin, balance:0, history:{}}).then(()=>{
+                  data = {pin: pin, balance:0, history:{}};
+                  alert("تم إنشاء الحساب الجديد بنجاح!");
+                  proceedLogin(user, data, auto);
+              });
+          } else {
+              if(data.pin !== pin){ alert("PIN خاطئ"); return; }
+              proceedLogin(user, data, auto);
+          }
+      });
+  });
+}
+
+// =================== متابعة تسجيل الدخول ===================
+function proceedLogin(user, data, auto){
+    currentUser = user;
+    balance = Number(data.balance || 0);
+
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("panel").style.display="block";
+    document.getElementById("name").innerText = user;
+    updateBalance();
+
+    if(document.getElementById("remember").checked || auto){
+        localStorage.setItem("bankUser",JSON.stringify({username:user,pin:data.pin}));
+    }
+
+    loadHistory();
+}
+
+// =================== Logout ===================
+function logout(){
+  localStorage.removeItem("bankUser");
+  location.reload();
+}
+
+// =================== Update Balance ===================
 function updateBalance(){
-    document.getElementById("balance").innerText = `رصيدك: ${balance} رصيد`;
+  document.getElementById("balance").innerText = `رصيدك: ${balance} رصيد`;
+}
+
+// =================== سجل العمليات ===================
+function saveHistory(type,amount){
+  let time = new Date().toLocaleString();
+  db.ref("gamerolex/"+currentUser+"/history").push({type,amount,time});
+  loadHistory();
+}
+
+function loadHistory(){
+  let box = document.getElementById("historyBox");
+  db.ref("gamerolex/"+currentUser+"/history").on("value",snap=>{
+    box.innerHTML = "<h3>سجل العمليات</h3>";
+    snap.forEach(s=>{
+      let h = s.val();
+      box.innerHTML += `• ${h.type} : ${h.amount} | ${h.time}<br>`;
+    });
+  });
 }
 
 // ------------------ شحن ------------------
@@ -178,6 +247,7 @@ function depositFromStake(){
             balance += amount;
             updateBalance();
             transferMsg.innerText=`✅ تم شحن ${amount} رصيد`; 
+            saveHistory("شحن",amount);
         });
     });
 }
@@ -194,6 +264,7 @@ function withdrawToStake(){
         balance -= amount;
         updateBalance();
         transferMsg.innerText=`✅ تم السحب`; 
+        saveHistory("سحب",amount);
     });
 }
 
@@ -279,11 +350,11 @@ function spinRoulette(){
         db.ref("gamerolex/"+currentUser).update({balance:balance});
         document.getElementById("rouletteResult").innerHTML=resultText;
         updateBalance();
+        saveHistory("روليت",betAmount);
     }
     requestAnimationFrame(animate);
 }
 drawRoulette();
-
 
 // ----------------- Slot Machine 4X -----------------
 let slotBusy = false;
@@ -334,12 +405,12 @@ function spinSlot(){
                 result=`<span class="win">🔥 4 متشابهة! +${win}</span>`;
             }
             else if(max===3){
-                let win=bet*1.9;
+                let win=bet*0.9;
                 balance+=win;
                 result=`<span class="win">⭐ 3 متشابهة! +${win}</span>`;
             }
             else if(max===2){
-                let win=bet*1.5;
+                let win=bet*0.5;
                 balance+=win;
                 result=`<span class="win">💠 2 متشابهة! +${win}</span>`;
             }
@@ -351,6 +422,7 @@ function spinSlot(){
             document.getElementById("slotResult").innerHTML=result;
             db.ref("gamerolex/"+currentUser).update({balance:balance});
             updateBalance();
+            saveHistory("ماكينة الحظ",bet);
             slotBusy=false;
         }
     },80);
